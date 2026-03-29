@@ -157,3 +157,19 @@ test "scanFile: fixtures/tcp_sample.txt を読み込んで 3 エントリ返す"
     try std.testing.expectEqual(.listen, entries.items[0].state);
     try std.testing.expectEqual(@as(u64, 12345), entries.items[0].inode);
 }
+
+test "scanFile: fixtures/tcp6_sample.txt を読み込んで 1 エントリ返す" {
+    const allocator = std.testing.allocator;
+    var entries: std.ArrayList(@import("types").PortEntry) = .empty;
+    defer entries.deinit(allocator);
+
+    try proc_net.scanFile(allocator, "tests/fixtures/tcp6_sample.txt", .tcp6, &entries);
+    try std.testing.expectEqual(@as(usize, 1), entries.items.len);
+    try std.testing.expect(entries.items[0].is_ipv6);
+    try std.testing.expectEqual(@as(u16, 8081), entries.items[0].local_port); // 0x1F91
+    try std.testing.expectEqual(.listen, entries.items[0].state);
+    try std.testing.expectEqual(@as(u64, 45678), entries.items[0].inode);
+    // ::1 のローカルアドレスを検証
+    const expected_addr6 = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
+    try std.testing.expectEqualSlices(u8, &expected_addr6, &entries.items[0].local_addr6);
+}

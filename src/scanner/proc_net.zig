@@ -49,7 +49,7 @@ pub fn parseTcpLine(allocator: std.mem.Allocator, line: []const u8, protocol: ty
     const remote_ip_hex = fields[2][0..remote_sep];
     const remote_port_hex = fields[2][remote_sep + 1 ..];
 
-    const is_ipv6 = local_ip_hex.len == 32;
+    const is_ipv6 = protocol == .tcp6 or protocol == .udp6;
 
     // state をパース (hex u8)
     const state_val = std.fmt.parseInt(u8, fields[3], 16) catch return null;
