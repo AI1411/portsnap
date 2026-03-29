@@ -1,5 +1,6 @@
 const std = @import("std");
 const hex = @import("hex");
+const proc_net = @import("proc_net");
 
 // --- parseHexU8 ---
 
@@ -105,4 +106,54 @@ test "decodeIpv6: 2001:db8:1234:5678:9abc:def0:1111:2222 (multi-group, little-en
 test "decodeIpv6: invalid length returns error" {
     try std.testing.expectError(error.InvalidLength, hex.decodeIpv6("0000000000000000000000000000000"));
     try std.testing.expectError(error.InvalidLength, hex.decodeIpv6("000000000000000000000000000000000"));
+}
+
+// --- parseTcpLine ---
+
+test "parseTcpLine: LISTEN エントリ" {
+    const allocator = std.testing.allocator;
+    // tcp_sample.txt の1行目: port=8080, state=LISTEN, inode=12345
+    const line = "   0: 00000000:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 12345 1 0000000000000000 100 0 0 10 0";
+    const entry = proc_net.parseTcpLine(allocator, line, .tcp) orelse {
+        return error.ExpectedEntry;
+    };
+    try std.testing.expectEqual(@as(u16, 8080), entry.local_port);
+    try std.testing.expectEqual(.listen, entry.state);
+    try std.testing.expectEqual(@as(u64, 12345), entry.inode);
+    try std.testing.expectEqual(false, entry.is_ipv6);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, &entry.local_addr);
+}
+
+test "parseTcpLine: ESTABLISHED エントリ" {
+    const allocator = std.testing.allocator;
+    // tcp_sample.txt の3行目: 172.17.0.5:8080 -> 172.17.0.3:53082, ESTABLISHED, inode=34567
+    const line = "   2: 050011AC:1F90 030011AC:CF5A 01 00000000:00000000 00:00000000 00000000  1000        0 34567 1 0000000000000000 20 4 24 10 -1";
+    const entry = proc_net.parseTcpLine(allocator, line, .tcp) orelse {
+        return error.ExpectedEntry;
+    };
+    try std.testing.expectEqual(@as(u16, 8080), entry.local_port);
+    try std.testing.expectEqual(.established, entry.state);
+    try std.testing.expectEqual(@as(u64, 34567), entry.inode);
+    try std.testing.expectEqual(false, entry.is_ipv6);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 172, 17, 0, 5 }, &entry.local_addr);
+    try std.testing.expectEqual(@as(u16, 0xCF5A), entry.remote_port);
+}
+
+test "parseTcpLine: ヘッダー行は null を返す" {
+    const allocator = std.testing.allocator;
+    const header = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode";
+    const result = proc_net.parseTcpLine(allocator, header, .tcp);
+    try std.testing.expectEqual(@as(?@import("types").PortEntry, null), result);
+}
+
+test "scanFile: fixtures/tcp_sample.txt を読み込んで 3 エントリ返す" {
+    const allocator = std.testing.allocator;
+    var entries: std.ArrayList(@import("types").PortEntry) = .empty;
+    defer entries.deinit(allocator);
+
+    try proc_net.scanFile(allocator, "tests/fixtures/tcp_sample.txt", .tcp, &entries);
+    try std.testing.expectEqual(@as(usize, 3), entries.items.len);
+    try std.testing.expectEqual(@as(u16, 8080), entries.items[0].local_port);
+    try std.testing.expectEqual(.listen, entries.items[0].state);
+    try std.testing.expectEqual(@as(u64, 12345), entries.items[0].inode);
 }
