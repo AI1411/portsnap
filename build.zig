@@ -28,12 +28,30 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const types_mod = b.createModule(.{
+        .root_source_file = b.path("src/scanner/types.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const proc_net_mod = b.createModule(.{
+        .root_source_file = b.path("src/scanner/proc_net.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "types", .module = types_mod },
+            .{ .name = "hex", .module = hex_mod },
+        },
+    });
+
     const test_mod = b.createModule(.{
         .root_source_file = b.path("tests/proc_net_test.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "hex", .module = hex_mod },
+            .{ .name = "proc_net", .module = proc_net_mod },
+            .{ .name = "types", .module = types_mod },
         },
     });
 
