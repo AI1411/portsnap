@@ -84,6 +84,24 @@ test "decodeIpv6: loopback 00000000000000000000000001000000 -> ::1" {
     try std.testing.expectEqualSlices(u8, &expected, &result);
 }
 
+test "decodeIpv6: 2001:db8:1234:5678:9abc:def0:1111:2222 (multi-group, little-endian path)" {
+    // 2001:0db8:1234:5678:9abc:def0:1111:2222
+    // Network byte order (16 bytes):
+    //   20 01 0d b8 | 12 34 56 78 | 9a bc de f0 | 11 11 22 22
+    // /proc/net/tcp6 on little-endian (each 32-bit group reversed):
+    //   B80D0120     78563412      F0DEBC9A      22221111
+    const builtin = @import("builtin");
+    if (builtin.cpu.arch.endian() != .little) return; // little-endian path only
+    const result = try hex.decodeIpv6("B80D012078563412F0DEBC9A22221111");
+    const expected = [_]u8{
+        0x20, 0x01, 0x0d, 0xb8,
+        0x12, 0x34, 0x56, 0x78,
+        0x9a, 0xbc, 0xde, 0xf0,
+        0x11, 0x11, 0x22, 0x22,
+    };
+    try std.testing.expectEqualSlices(u8, &expected, &result);
+}
+
 test "decodeIpv6: invalid length returns error" {
     try std.testing.expectError(error.InvalidLength, hex.decodeIpv6("0000000000000000000000000000000"));
     try std.testing.expectError(error.InvalidLength, hex.decodeIpv6("000000000000000000000000000000000"));
