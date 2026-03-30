@@ -1,7 +1,13 @@
 // src/utils/color.zig
 // ANSI escape color code helpers for terminal output.
+//
+// NO_COLOR / non-TTY policy:
+//   This module always returns raw ANSI escape sequences.
+//   Callers are responsible for suppressing color output when needed
+//   (e.g. check std.io.getStdOut().isTty() or the NO_COLOR env var
+//   before passing the result to a writer).
 
-const types = @import("../scanner/types.zig");
+const types = @import("types");
 const SocketState = types.SocketState;
 
 // Reset and style codes
