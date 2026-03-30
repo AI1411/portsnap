@@ -129,6 +129,16 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const select_mod = b.createModule(.{
+        .root_source_file = b.path("src/output/select.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "types", .module = types_mod },
+            .{ .name = "signal", .module = signal_mod },
+        },
+    });
+
     const kill_action_mod = b.createModule(.{
         .root_source_file = b.path("src/action/kill.zig"),
         .target = target,
@@ -188,6 +198,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "wait_action", .module = wait_action_mod },
                 .{ .name = "check_action", .module = check_action_mod },
                 .{ .name = "docker", .module = docker_mod },
+                .{ .name = "select", .module = select_mod },
             },
         }),
     });
@@ -282,6 +293,17 @@ pub fn build(b: *std.Build) void {
     const filter_tests = b.addTest(.{ .root_module = filter_test_mod });
     const run_filter_tests = b.addRunArtifact(filter_tests);
 
+    const select_test_mod = b.createModule(.{
+        .root_source_file = b.path("tests/select_test.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "select", .module = select_mod },
+        },
+    });
+    const select_tests = b.addTest(.{ .root_module = select_test_mod });
+    const run_select_tests = b.addRunArtifact(select_tests);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
     test_step.dependOn(&run_proc_fd_tests.step);
@@ -289,4 +311,5 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_color_tests.step);
     test_step.dependOn(&run_table_tests.step);
     test_step.dependOn(&run_filter_tests.step);
+    test_step.dependOn(&run_select_tests.step);
 }
