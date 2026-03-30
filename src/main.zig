@@ -14,6 +14,7 @@ const wait_action = @import("wait_action");
 const check_action = @import("check_action");
 const tui = @import("tui");
 const docker = @import("docker");
+const select = @import("select");
 
 const Subcommand = enum {
     list,
@@ -140,7 +141,8 @@ pub fn main() !void {
             if (use_json) {
                 try json_out.printJson(filtered.items, &stdout_writer.interface);
                 try stdout_writer.interface.flush();
-            } else {
+            } else if (!std.fs.File.stdout().isTty()) {
+                // 非TTY（パイプ等）は従来のテーブル出力
                 try table.printTable(filtered.items, &stdout_writer.interface);
                 if (use_docker) {
                     const docker_ports = docker.fetchDockerPorts(allocator) catch &[_]docker.DockerPort{};
@@ -160,6 +162,9 @@ pub fn main() !void {
                     }
                 }
                 try stdout_writer.interface.flush();
+            } else {
+                // TTY かつ非JSON → インタラクティブ選択モード
+                try select.run(allocator, filtered.items);
             }
         },
     }
