@@ -13,6 +13,7 @@ const kill_action = @import("kill_action");
 const wait_action = @import("wait_action");
 const check_action = @import("check_action");
 const tui = @import("tui");
+const docker = @import("docker");
 
 const Subcommand = enum {
     list,

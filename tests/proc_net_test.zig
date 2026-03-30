@@ -175,6 +175,18 @@ test "scanFile: fixtures/tcp6_sample.txt を読み込んで 1 エントリ返す
     try std.testing.expectEqualSlices(u8, &expected_addr6, &entries.items[0].local_addr6);
 }
 
+test "scanFile: fixtures/udp_sample.txt を読み込んで 1 エントリ返す" {
+    const allocator = std.testing.allocator;
+    var entries: std.ArrayList(@import("types").PortEntry) = .empty;
+    defer entries.deinit(allocator);
+
+    try proc_net.scanFile(allocator, "tests/fixtures/udp_sample.txt", .udp, &entries);
+    try std.testing.expectEqual(@as(usize, 1), entries.items.len);
+    try std.testing.expectEqual(@as(u16, 53), entries.items[0].local_port); // 0x0035
+    try std.testing.expectEqual(.udp, entries.items[0].protocol);
+    try std.testing.expectEqual(false, entries.items[0].is_ipv6);
+}
+
 // --- PortFilter ---
 
 test "PortFilter: 単一ポートマッチ" {
