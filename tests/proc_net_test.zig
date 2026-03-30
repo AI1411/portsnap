@@ -1,6 +1,7 @@
 const std = @import("std");
 const hex = @import("hex");
 const proc_net = @import("proc_net");
+const port_filter = @import("port_filter");
 
 // --- parseHexU8 ---
 
@@ -172,4 +173,18 @@ test "scanFile: fixtures/tcp6_sample.txt を読み込んで 1 エントリ返す
     // ::1 のローカルアドレスを検証
     const expected_addr6 = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
     try std.testing.expectEqualSlices(u8, &expected_addr6, &entries.items[0].local_addr6);
+}
+
+// --- PortFilter ---
+
+test "PortFilter: 単一ポートマッチ" {
+    const f = try port_filter.PortFilter.parse(std.testing.allocator, ":8080");
+    try std.testing.expect(f.matches(8080));
+    try std.testing.expect(!f.matches(3000));
+}
+
+test "PortFilter: 範囲マッチ" {
+    const f = try port_filter.PortFilter.parse(std.testing.allocator, ":3000-9000");
+    try std.testing.expect(f.matches(5000));
+    try std.testing.expect(!f.matches(2999));
 }
