@@ -4,24 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{
-        .name = "portsnap",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    b.installArtifact(exe);
-
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
-
+    // ── 共有モジュール定義 ─────────────────────────────────────────
     const hex_mod = b.createModule(.{
         .root_source_file = b.path("src/utils/hex.zig"),
         .target = target,
@@ -32,6 +15,15 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/scanner/types.zig"),
         .target = target,
         .optimize = optimize,
+    });
+
+    const color_mod = b.createModule(.{
+        .root_source_file = b.path("src/utils/color.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "types", .module = types_mod },
+        },
     });
 
     const proc_net_mod = b.createModule(.{
@@ -62,6 +54,43 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    const table_mod = b.createModule(.{
+        .root_source_file = b.path("src/output/table.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "types", .module = types_mod },
+            .{ .name = "color", .module = color_mod },
+        },
+    });
+
+    // ── 実行ファイル ──────────────────────────────────────────────
+    const exe = b.addExecutable(.{
+        .name = "portsnap",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "types", .module = types_mod },
+                .{ .name = "proc_net", .module = proc_net_mod },
+                .{ .name = "proc_fd", .module = proc_fd_mod },
+                .{ .name = "proc_info", .module = proc_info_mod },
+                .{ .name = "table", .module = table_mod },
+            },
+        }),
+    });
+    b.installArtifact(exe);
+
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+    }
+    const run_step = b.step("run", "Run the app");
+    run_step.dependOn(&run_cmd.step);
+
+    // ── テスト ──────────────────────────────────────────────────
     const test_mod = b.createModule(.{
         .root_source_file = b.path("tests/proc_net_test.zig"),
         .target = target,
@@ -93,30 +122,6 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const unit_tests = b.addTest(.{
-        .root_module = test_mod,
-    });
-    const run_unit_tests = b.addRunArtifact(unit_tests);
-
-    const proc_fd_tests = b.addTest(.{
-        .root_module = proc_fd_test_mod,
-    });
-    const run_proc_fd_tests = b.addRunArtifact(proc_fd_tests);
-
-    const proc_info_tests = b.addTest(.{
-        .root_module = proc_info_test_mod,
-    });
-    const run_proc_info_tests = b.addRunArtifact(proc_info_tests);
-
-    const color_mod = b.createModule(.{
-        .root_source_file = b.path("src/utils/color.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "types", .module = types_mod },
-        },
-    });
-
     const color_test_mod = b.createModule(.{
         .root_source_file = b.path("tests/color_test.zig"),
         .target = target,
@@ -127,14 +132,35 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const color_tests = b.addTest(.{
-        .root_module = color_test_mod,
+    const table_test_mod = b.createModule(.{
+        .root_source_file = b.path("tests/table_test.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "types", .module = types_mod },
+            .{ .name = "table", .module = table_mod },
+        },
     });
+
+    const unit_tests = b.addTest(.{ .root_module = test_mod });
+    const run_unit_tests = b.addRunArtifact(unit_tests);
+
+    const proc_fd_tests = b.addTest(.{ .root_module = proc_fd_test_mod });
+    const run_proc_fd_tests = b.addRunArtifact(proc_fd_tests);
+
+    const proc_info_tests = b.addTest(.{ .root_module = proc_info_test_mod });
+    const run_proc_info_tests = b.addRunArtifact(proc_info_tests);
+
+    const color_tests = b.addTest(.{ .root_module = color_test_mod });
     const run_color_tests = b.addRunArtifact(color_tests);
+
+    const table_tests = b.addTest(.{ .root_module = table_test_mod });
+    const run_table_tests = b.addRunArtifact(table_tests);
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
     test_step.dependOn(&run_proc_fd_tests.step);
     test_step.dependOn(&run_proc_info_tests.step);
     test_step.dependOn(&run_color_tests.step);
+    test_step.dependOn(&run_table_tests.step);
 }
