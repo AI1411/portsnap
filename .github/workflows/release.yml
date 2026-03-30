@@ -13,6 +13,7 @@ jobs:
     name: Build ${{ matrix.target }}
     runs-on: macos-latest
     strategy:
+      fail-fast: false
       matrix:
         target:
           - aarch64-macos
@@ -22,7 +23,7 @@ jobs:
 
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.0
+          version: 0.15.2
 
       - name: Build binary
         run: |
@@ -58,12 +59,14 @@ jobs:
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
-          gh release create ${{ github.ref_name }} \
+          gh release create "$TAG" \
             pps-aarch64-macos.tar.gz \
             pps-x86_64-macos.tar.gz \
-            --repo ${{ github.repository }} \
-            --title "${{ github.ref_name }}" \
+            --repo "$REPO" \
+            --title "$TAG" \
             --generate-notes
 
   update-tap:
@@ -87,9 +90,11 @@ jobs:
           sed -i "s/sha256 \"[0-9a-f]*\" # x86_64/sha256 \"${X86_64_SHA256}\" # x86_64/" Formula/pps.rb
 
       - name: Commit and push
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/pps.rb
-          git commit -m "chore: update pps to ${{ github.ref_name }}"
+          git diff --staged --quiet || git commit -m "chore: update pps to $TAG"
           git push
