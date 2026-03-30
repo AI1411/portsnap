@@ -6,7 +6,7 @@ const types = @import("types");
 
 /// 指定した proc_path を走査して inode → PID の HashMap を構築する（テスト用）。
 /// /proc/<pid>/fd/<fd> のシンボリックリンクが "socket:[inode]" のパターンに一致する場合、
-/// inode を PID にマッピングする。
+/// inode を PID にマッピングする。同一 inode に複数 PID が紐づく場合は最小 PID を採用する。
 pub fn buildInodePidMapFromPath(allocator: std.mem.Allocator, proc_path: []const u8) !std.AutoHashMap(u64, u32) {
     var map = std.AutoHashMap(u64, u32).init(allocator);
     errdefer map.deinit();
@@ -47,8 +47,10 @@ pub fn buildInodePidMapFromPath(allocator: std.mem.Allocator, proc_path: []const
             const inode_str = link_target[prefix.len .. link_target.len - 1];
             const inode = std.fmt.parseInt(u64, inode_str, 10) catch continue;
 
-            // 既にエントリがある場合はスキップ (先勝ち)
-            if (!map.contains(inode)) {
+            // 同一 inode に複数 PID が紐づく場合は最小 PID を採用（決定的な挙動）
+            if (map.getPtr(inode)) |existing| {
+                if (pid < existing.*) existing.* = pid;
+            } else {
                 try map.put(inode, pid);
             }
         }
@@ -62,14 +64,19 @@ pub fn buildInodePidMap(allocator: std.mem.Allocator) !std.AutoHashMap(u64, u32)
     return buildInodePidMapFromPath(allocator, "/proc");
 }
 
-/// buildInodePidMap で取得したマップを使い、各 PortEntry に pid を付与する。
-pub fn resolvePids(allocator: std.mem.Allocator, entries: []types.PortEntry) !void {
-    var map = try buildInodePidMap(allocator);
+/// 指定した proc_path を使い、各 PortEntry に pid を付与する（テスト用）。
+/// マップに存在しない inode の pid は null にリセットする。
+pub fn resolvePidsFromPath(allocator: std.mem.Allocator, entries: []types.PortEntry, proc_path: []const u8) !void {
+    var map = try buildInodePidMapFromPath(allocator, proc_path);
     defer map.deinit();
 
     for (entries) |*entry| {
-        if (map.get(entry.inode)) |pid| {
-            entry.pid = pid;
-        }
+        entry.pid = map.get(entry.inode);
     }
+}
+
+/// buildInodePidMap で取得したマップを使い、各 PortEntry に pid を付与する。
+/// マップに存在しない inode の pid は null にリセットする。
+pub fn resolvePids(allocator: std.mem.Allocator, entries: []types.PortEntry) !void {
+    return resolvePidsFromPath(allocator, entries, "/proc");
 }

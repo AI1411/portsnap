@@ -74,12 +74,12 @@ test "buildInodePidMapFromPath: 数字以外のディレクトリは無視" {
     try std.testing.expectEqual(@as(usize, 0), map.count());
 }
 
-test "buildInodePidMapFromPath: 同一 inode は先勝ち" {
+test "buildInodePidMapFromPath: 同一 inode は最小 PID を採用" {
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
 
-    // PID 100 と PID 200 が同じ inode を持つ場合、先に処理した方が勝つ
+    // PID 100 と PID 200 が同じ inode を持つ場合、最小 PID (100) が採用される
     try buildFakeProcDir(tmp.dir, 100, 0, "socket:[77777]");
     try buildFakeProcDir(tmp.dir, 200, 0, "socket:[77777]");
 
@@ -89,10 +89,7 @@ test "buildInodePidMapFromPath: 同一 inode は先勝ち" {
     var map = try proc_fd.buildInodePidMapFromPath(allocator, abs_path);
     defer map.deinit();
 
-    // いずれか1つの PID がマッピングされる（先勝ち）
-    const pid = map.get(77777);
-    try std.testing.expect(pid != null);
-    try std.testing.expect(pid.? == 100 or pid.? == 200);
+    try std.testing.expectEqual(@as(?u32, 100), map.get(77777));
 }
 
 test "buildInodePidMapFromPath: 複数 PID・複数 fd のマッピング" {
@@ -117,7 +114,7 @@ test "buildInodePidMapFromPath: 複数 PID・複数 fd のマッピング" {
     try std.testing.expectEqual(@as(?u32, 20), map.get(2001));
 }
 
-test "resolvePids: inode が一致する PortEntry に pid を付与" {
+test "resolvePidsFromPath: inode が一致する PortEntry に pid を付与" {
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -126,10 +123,6 @@ test "resolvePids: inode が一致する PortEntry に pid を付与" {
 
     const abs_path = try tmp.dir.realpathAlloc(allocator, ".");
     defer allocator.free(abs_path);
-
-    // buildInodePidMap の代わりに resolvePidsFromPath を使う
-    var map = try proc_fd.buildInodePidMapFromPath(allocator, abs_path);
-    defer map.deinit();
 
     var entries = [_]types.PortEntry{
         .{
@@ -150,11 +143,41 @@ test "resolvePids: inode が一致する PortEntry に pid を付与" {
         },
     };
 
-    for (&entries) |*entry| {
-        if (map.get(entry.inode)) |pid| {
-            entry.pid = pid;
-        }
-    }
+    try proc_fd.resolvePidsFromPath(allocator, &entries, abs_path);
 
     try std.testing.expectEqual(@as(?u32, 42), entries[0].pid);
+}
+
+test "resolvePidsFromPath: inode が一致しない PortEntry の pid は null になる" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    // inode 9999 は登録しない
+    const abs_path = try tmp.dir.realpathAlloc(allocator, ".");
+    defer allocator.free(abs_path);
+
+    var entries = [_]types.PortEntry{
+        .{
+            .protocol = .tcp,
+            .local_addr = .{ 0, 0, 0, 0 },
+            .local_addr6 = .{0} ** 16,
+            .local_port = 8080,
+            .remote_addr = .{ 0, 0, 0, 0 },
+            .remote_addr6 = .{0} ** 16,
+            .remote_port = 0,
+            .state = .listen,
+            .inode = 9999,
+            .pid = 999, // 既存の pid を設定しておく
+            .process_name = null,
+            .cmdline = null,
+            .uid = 1000,
+            .is_ipv6 = false,
+        },
+    };
+
+    try proc_fd.resolvePidsFromPath(allocator, &entries, abs_path);
+
+    // マップにない inode は null にリセットされる
+    try std.testing.expectEqual(@as(?u32, null), entries[0].pid);
 }
