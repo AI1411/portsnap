@@ -132,6 +132,16 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    const table_test_mod = b.createModule(.{
+        .root_source_file = b.path("tests/table_test.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "types", .module = types_mod },
+            .{ .name = "table", .module = table_mod },
+        },
+    });
+
     const unit_tests = b.addTest(.{ .root_module = test_mod });
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
@@ -144,9 +154,13 @@ pub fn build(b: *std.Build) void {
     const color_tests = b.addTest(.{ .root_module = color_test_mod });
     const run_color_tests = b.addRunArtifact(color_tests);
 
+    const table_tests = b.addTest(.{ .root_module = table_test_mod });
+    const run_table_tests = b.addRunArtifact(table_tests);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
     test_step.dependOn(&run_proc_fd_tests.step);
     test_step.dependOn(&run_proc_info_tests.step);
     test_step.dependOn(&run_color_tests.step);
+    test_step.dependOn(&run_table_tests.step);
 }

@@ -6,10 +6,10 @@ const types = @import("types");
 const color = @import("color");
 
 const col_proto: usize = 6;
-const col_local: usize = 30;
+const col_local: usize = 47; // "[xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx]:65535" = 47 chars
 const col_state: usize = 12;
 const col_pid: usize = 7;
-const col_process: usize = 13;
+const col_process: usize = 16; // /proc/[pid]/comm は最大 15 文字
 const col_command: usize = 40;
 
 fn formatLocalAddr(entry: types.PortEntry, buf: []u8) []const u8 {
@@ -33,11 +33,12 @@ fn formatLocalAddr(entry: types.PortEntry, buf: []u8) []const u8 {
 }
 
 /// 文字列を width 文字になるようスペースでパディングして writer に出力する。
-/// 文字列が width 以上の場合はそのまま出力する。
+/// 文字列が width を超える場合は width 文字で切り詰める。
 fn writeCol(writer: anytype, s: []const u8, width: usize) !void {
-    try writer.writeAll(s);
-    if (s.len < width) {
-        const pad = width - s.len;
+    const actual = if (s.len > width) s[0..width] else s;
+    try writer.writeAll(actual);
+    if (actual.len < width) {
+        const pad = width - actual.len;
         var i: usize = 0;
         while (i < pad) : (i += 1) try writer.writeByte(' ');
     }

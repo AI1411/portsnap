@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const types = @import("types");
 const proc_net = @import("proc_net");
 const proc_fd = @import("proc_fd");
@@ -6,6 +7,14 @@ const proc_info = @import("proc_info");
 const table = @import("table");
 
 pub fn main() !void {
+    if (comptime builtin.os.tag != .linux) {
+        var stderr_buf: [256]u8 = undefined;
+        var stderr_writer = std.fs.File.stderr().writer(&stderr_buf);
+        try stderr_writer.interface.writeAll("portsnap: only supported on Linux\n");
+        try stderr_writer.interface.flush();
+        std.process.exit(1);
+    }
+
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
