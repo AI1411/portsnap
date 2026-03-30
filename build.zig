@@ -54,6 +54,12 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    const port_filter_mod = b.createModule(.{
+        .root_source_file = b.path("src/filter/port.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const table_mod = b.createModule(.{
         .root_source_file = b.path("src/output/table.zig"),
         .target = target,
@@ -99,6 +105,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "hex", .module = hex_mod },
             .{ .name = "proc_net", .module = proc_net_mod },
             .{ .name = "types", .module = types_mod },
+            .{ .name = "port_filter", .module = port_filter_mod },
         },
     });
 
