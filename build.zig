@@ -98,6 +98,19 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/output/tui.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "types", .module = types_mod },
+            .{ .name = "proc_net", .module = proc_net_mod },
+            .{ .name = "proc_fd", .module = proc_fd_mod },
+            .{ .name = "proc_info", .module = proc_info_mod },
+            .{ .name = "state_filter", .module = state_filter_mod },
+        },
+    });
+
+    const docker_mod = b.createModule(.{
+        .root_source_file = b.path("src/scanner/docker.zig"),
+        .target = target,
+        .optimize = optimize,
     });
 
     const signal_mod = b.createModule(.{
@@ -164,6 +177,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "kill_action", .module = kill_action_mod },
                 .{ .name = "wait_action", .module = wait_action_mod },
                 .{ .name = "check_action", .module = check_action_mod },
+                .{ .name = "docker", .module = docker_mod },
             },
         }),
     });
